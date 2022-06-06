@@ -1,19 +1,80 @@
+const path = require('path')
+const fs = require('fs')
 const express = require('express')
 const app = express()
 const cors = require('cors')
 
-//modules for static file
-var path = require("path")
-var fs = require("fs")
 app.use(express.json())
-app.use(cors())
+app.use(cors());
 
-//logger middleware
-app.use(function (req, res, next) {
-    console.log("Request URL: " + req.url);
-    console.log("Request Date: " + new Date());
-    next();
-});
+// MONGODB CONNECTION
+const MongoClient = require('mongodb').MongoClient;
+let db;
+MongoClient.connect("mongodb+srv://pelumiola1:olaayanfe123@cluster0.j0gma.mongodb.net/?retryWrites=true&w=majority", (err, client) => {
+    db = client.db('lessons')
+})
+
+// GET THE COLLECTION NAME
+app.param('collectionName', (req, res, next, collectionName) => {
+    req.collection = db.collection(collectionName)
+    return next()
+})
+
+// MIDDLEWARE FOR LOGGING
+app.use(function(req, res, next){
+    console.log("Request type: "+req.method)
+    console.log("Request url: "+req.url)
+    console.log("Request date: "+new Date())
+    console.log("Request IP: "+req.ip)
+    next()
+})
+
+app.get('/', (req, res) => {
+    res.send("Welcome to entry point")
+})
+
+// GET ALL LESSONS FOM DB
+app.get('/collection/:collectionName', (req, res) => {
+    req.collection.find({}).toArray((err, results) => {
+        if (err) return next(err)
+        res.send(results)
+    })
+})
+
+app.post('/collection/:collectionName', (req, res) => {
+    let doc = req.body
+    req.collection.insertOne(doc, (err, result) => {
+        if (err) return next(err)
+        res.send({msg: "order added successfully"})
+    })
+})
+
+// UPDATE SPACES OF LESSONS IN DB AFTER ORDER
+app.put('/collection/:collectionName', (req, res) => {
+    req.body.forEach((item) => {
+        let filter = { id: item.id }
+        let new_value = { $set: {space: item.space} }
+        let options = { safe: true, multi: false }
+        req.collection.updateOne(filter, new_value, options, (err, result) => {
+            if (err) return next(err)
+        })
+    });
+    res.send({msg: "spaces successfully updated"})
+})
+
+
+// BACKEND SEARCH FUNCTION
+app.get('/collection/:collectionName/search', (req, res) => {
+    let search_keyword = req.query.search
+    req.collection.find({}).toArray((err, results) => {
+        if (err) return next(err)
+        let filteredList = results.filter((subject) => {
+            return subject.subjectname.toLowerCase().match(search_keyword.toLowerCase()) || subject.location.toLowerCase().match(search_keyword.toLowerCase())
+        });  
+        res.send(filteredList)
+    })
+})
+
 // STATIC FILE MIDDLEWARE
 app.use(function(req, res, next){
     var filePath = path.join(__dirname, "static", req.url)
@@ -31,64 +92,12 @@ app.use(function(req, res, next){
     })
 })
 
-// connect to MongoDB
-const ObjectId = require('mongodb').ObjectId;
-const MongoClient = require('mongodb').MongoClient;
-let db;
-MongoClient.connect('mongodb+srv://pelumiola1:olaayanfe123@cluster0.j0gma.mongodb.net/?retryWrites=true&w=majority', (err, client) => {
-    db = client.db('lessons')
+app.use(function(req, res){
+    res.status(404)
+    res.send("file not found")
 })
-// Parameters middleware
-app.param('collectionName', (req, res, next, collectionName) => {
-    req.collection = db.collection(collectionName);
-    return next()
-});
-// dispaly a message for root path to show that API is working
-app.get('/', (req, res, next) => {
-    res.send('Select a collection, e.g., /collection/messages')
-})
-// GET ALL LESSONS FROM DB
-// retrieve all the objects from an collection
-app.get('/collection/:collectionName', (req, res, next) => {
-    req.collection.find({}).toArray((e, results) => {
-        if (e) return next(e)
-        res.send(results)
-    })
-})
-
-// retrieve an object by mongodb ID
-app.get('/collection/:collectionName/:id', (req, res, next) => {
-    req.collection.findOne(
-        { _id: new ObjectId(req.params.id) },
-        (e, result) => {
-            if (e) return next(e)
-            res.send(result)
-        }) 
-})
-
-// Insert JSON Object to MongoDB - Add an Order
-app.post('/collection/:collectionName', (req, res, next) => {
-    req.collection.insertOne(req.body, (e, results) => {
-        if (e) return next(e);
-        console.log(results);
-        res.json(results)
-    })
-})
-
-// Update lesson by ID
-app.put('/collection/:collectionName/:id', (req, res, next) => {
-    req.collection.updateOne(
-        { _id: new ObjectId(req.params.id) },
-        { $set: req.body },
-        { safe: true, multi: false },
-        (e, result) => {
-            console.log(result)
-            if (e) return next(e)
-            res.send((result.modifiedCount === 1) ? 
-                { msg: 'success' } : { msg: 'error' })
-        })
-})
-
 
 const port = process.env.PORT || 3000
-app.listen(port)
+app.listen(port, () => {
+    console.log("Running on port 3000")
+})
