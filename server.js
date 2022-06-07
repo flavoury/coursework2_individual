@@ -13,7 +13,7 @@ let db;
 MongoClient.connect("mongodb+srv://pelumiola1:olaayanfe123@cluster0.j0gma.mongodb.net/?retryWrites=true&w=majority", (err, client) => {
     db = client.db('lessons')
 })
-
+        
 // GET THE COLLECTION NAME
 app.param('collectionName', (req, res, next, collectionName) => {
     req.collection = db.collection(collectionName)
@@ -40,7 +40,7 @@ app.get('/collection/:collectionName', (req, res) => {
         res.send(results)
     })
 })
-
+//Add order to db
 app.post('/collection/:collectionName', (req, res) => {
     let doc = req.body
     req.collection.insertOne(doc, (err, result) => {
@@ -53,7 +53,7 @@ app.post('/collection/:collectionName', (req, res) => {
 app.put('/collection/:collectionName', (req, res) => {
     req.body.forEach((item) => {
         let filter = { id: item.id }
-        let new_value = { $set: {space: item.space} }
+        let new_value = { $set: {numberofspaces: item.numberofspaces} }
         let options = { safe: true, multi: false }
         req.collection.updateOne(filter, new_value, options, (err, result) => {
             if (err) return next(err)
